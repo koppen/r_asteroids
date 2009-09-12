@@ -35,11 +35,12 @@ class Actor
   end
   
   def keep_on_screen
+    radius = self.size / 2
     # Keep the player on the screen. This isn't totally perfect, but works for now
-    @x += window.width if @x < 0
-    @x -= window.width if @x > window.width
-    @y += window.height if @y < 0
-    @y -= window.height if @y > window.height
+    @x = window.width + radius if @x < -radius
+    @x = -radius if @x > window.width + radius
+    @y = window.height + radius if @y < -radius
+    @y = -radius if @y > window.height + radius
   end
 
   def move
