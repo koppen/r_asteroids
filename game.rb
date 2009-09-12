@@ -2,36 +2,54 @@
 
 require 'rubygems'
 require 'gosu'
-srand
-
+require 'activesupport'
 class GameWindow < Gosu::Window
 
   def initialize
     super(800, 600, false)
 
-    @player = Player.new(self)
-    @meteor = Meteor.new(self)
+    @actors = []
+    @actors << Player.new(self)
+    @actors << Meteor.new(self)
   end
   
   def update
     # Quit?
     exit if button_down? Gosu::Button::KbEscape
 
-    @player.update
-    @meteor.update
+    @actors.each(&:update)
   end
   
   def draw
-    @player.draw
-    @meteor.draw
+    @actors.each(&:draw)
   end
 
 end
 
 
-class Player
+class Actor
   attr_accessor :window, :x, :y, :angle, :size
+
+  def draw
+    @image.draw_rot(self.x, self.y, 0, self.angle)
+  end
   
+  def keep_on_screen
+    # Keep the player on the screen. This isn't totally perfect, but works for now
+    @x += window.width if @x < 0
+    @x -= window.width if @x > window.width
+    @y += window.height if @y < 0
+    @y -= window.height if @y > window.height
+  end
+
+  def move
+    @x += @speed_x
+    @y += @speed_y
+  end
+end
+
+class Player < Actor
+
   def initialize(window)
     @window = window
 
@@ -46,7 +64,7 @@ class Player
 
     @image = Gosu::Image.new(window, 'resources/graphics/player.png')
   end
-  
+
   def update
     # Rotate left and right
     @angle += 4 if window.button_down? Gosu::Button::KbRight
@@ -62,25 +80,13 @@ class Player
     @speed_x = @speed_x * 0.97
     @speed_y = @speed_y * 0.97
 
-    # Move the player
-    @x += @speed_x
-    @y += @speed_y
-
-    # Keep the player on the screen. This isn't totally perfect, but works for now
-    @x += window.width if @x < 0
-    @x -= window.width if @x > window.width
-    @y += window.height if @y < 0
-    @y -= window.height if @y > window.height
-  end
-  
-  def draw
-    @image.draw_rot(self.x, self.y, 0, self.angle)
+    self.move
+    self.keep_on_screen
   end
   
 end
 
-class Meteor
-  attr_accessor :window, :x, :y, :angle, :size
+class Meteor < Actor
 
   def initialize(window)
     @window = window
@@ -99,21 +105,10 @@ class Meteor
   end
 
   def update
-    # Move the meteor
-    @x += @speed_x
-    @y += @speed_y
-
     @angle += @rotation_speed
 
-    # Keep the meteor on the screen. This isn't totally perfect, but works for now
-    @x += window.width if @x < 0
-    @x -= window.width if @x > window.width
-    @y += window.height if @y < 0
-    @y -= window.height if @y > window.height
-  end
-
-  def draw
-    @image.draw_rot(self.x, self.y, 0, self.angle)
+    self.move
+    self.keep_on_screen
   end
 
 end
