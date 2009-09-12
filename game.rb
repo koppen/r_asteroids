@@ -2,6 +2,7 @@
 
 require 'rubygems'
 require 'gosu'
+srand
 
 class GameWindow < Gosu::Window
 
@@ -9,6 +10,7 @@ class GameWindow < Gosu::Window
     super(800, 600, false)
 
     @player = Player.new(self)
+    @meteor = Meteor.new(self)
   end
   
   def update
@@ -16,17 +18,19 @@ class GameWindow < Gosu::Window
     exit if button_down? Gosu::Button::KbEscape
 
     @player.update
+    @meteor.update
   end
   
   def draw
     @player.draw
+    @meteor.draw
   end
 
 end
 
 
 class Player
-  attr_accessor :window, :x, :y, :angle
+  attr_accessor :window, :x, :y, :angle, :size
   
   def initialize(window)
     @window = window
@@ -35,6 +39,7 @@ class Player
     @x = window.width / 2
     @y = window.height / 2
     @angle = 0
+    @size = 30
     
     @speed_x = 0
     @speed_y = 0
@@ -66,7 +71,6 @@ class Player
     @x -= window.width if @x > window.width
     @y += window.height if @y < 0
     @y -= window.height if @y > window.height
-
   end
   
   def draw
@@ -75,6 +79,43 @@ class Player
   
 end
 
+class Meteor
+  attr_accessor :window, :x, :y, :angle, :size
 
+  def initialize(window)
+    @window = window
+
+    # Place the Meteor in the center of the GameWindow
+    @x = 0
+    @y = 0
+    @angle = Gosu::random(0, 359)
+    @rotation_speed = Gosu::random(-1, 1)
+    @size = 80
+    
+    @speed_x = Gosu::random(-2, 2)
+    @speed_y = Gosu::random(-2, 2)
+
+    @image = Gosu::Image.new(window, 'resources/graphics/meteor_1.png')
+  end
+
+  def update
+    # Move the meteor
+    @x += @speed_x
+    @y += @speed_y
+
+    @angle += @rotation_speed
+
+    # Keep the meteor on the screen. This isn't totally perfect, but works for now
+    @x += window.width if @x < 0
+    @x -= window.width if @x > window.width
+    @y += window.height if @y < 0
+    @y -= window.height if @y > window.height
+  end
+
+  def draw
+    @image.draw_rot(self.x, self.y, 0, self.angle)
+  end
+
+end
 
 GameWindow.new.show
