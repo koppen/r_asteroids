@@ -44,8 +44,8 @@ class Player
   
   def update
     # Rotate left and right
-    @angle += 3 if window.button_down? Gosu::Button::KbRight
-    @angle -= 3 if window.button_down? Gosu::Button::KbLeft
+    @angle += 4 if window.button_down? Gosu::Button::KbRight
+    @angle -= 4 if window.button_down? Gosu::Button::KbLeft
 
     # Increase the speed along the axis
     if window.button_down? Gosu::Button::KbUp
@@ -60,6 +60,13 @@ class Player
     # Move the player
     @x += @speed_x
     @y += @speed_y
+
+    # Keep the player on the screen. This isn't totally perfect, but works for now
+    @x += window.width if @x < 0
+    @x -= window.width if @x > window.width
+    @y += window.height if @y < 0
+    @y -= window.height if @y > window.height
+
   end
   
   def draw
