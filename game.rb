@@ -24,6 +24,10 @@ class GameWindow < Gosu::Window
     @actors.each(&:draw)
   end
 
+  def player
+    @actors.find { |actor| actor.is_a?(Player) }
+  end
+
 end
 
 
@@ -84,7 +88,18 @@ class Player < Actor
     self.move
     self.keep_on_screen
   end
-  
+
+  def die
+    (@explosion ||= Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav')).play
+
+    # Center the player
+    self.x = window.width / 2
+    self.y = window.height / 2
+
+    # Reset speeds
+    @angle = @speed_x = @speed_y = 0
+  end
+
 end
 
 class Meteor < Actor
@@ -97,8 +112,8 @@ class Meteor < Actor
     @y = 0
     @angle = Gosu::random(0, 359)
     @rotation_speed = Gosu::random(-1, 1)
-    @size = 80
-    
+    @size = 100
+
     @speed_x = Gosu::random(-2, 2)
     @speed_y = Gosu::random(-2, 2)
 
@@ -106,6 +121,10 @@ class Meteor < Actor
   end
 
   def update
+    player = window.player
+    distance_to_player = Gosu::distance(self.x, self.y, player.x, player.y)
+    player.die if distance_to_player < (self.size + player.size) / 2
+
     @angle += @rotation_speed
 
     self.move
