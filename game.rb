@@ -9,8 +9,8 @@ class GameWindow < Gosu::Window
     super(800, 600, false)
 
     @actors = []
-    @actors << Player.new(self)
-    @actors << Meteor.new(self)
+    spawn_actor(Player.new(self))
+    spawn_actor(Meteor.new(self))
   end
   
   def update
@@ -26,6 +26,18 @@ class GameWindow < Gosu::Window
 
   def player
     @actors.find { |actor| actor.is_a?(Player) }
+  end
+
+  def meteor
+    @actors.find { |actor| actor.is_a?(Meteor) }
+  end
+
+  def spawn_actor(actor)
+    @actors << actor
+  end
+
+  def remove_actor(actor)
+    @actors.delete(actor)
   end
 
 end
@@ -54,6 +66,7 @@ class Actor
 end
 
 class Player < Actor
+  attr_accessor :angle
 
   def initialize(window)
     @window = window
@@ -81,6 +94,8 @@ class Player < Actor
       @speed_y += Gosu::offset_y(self.angle, 0.5)
     end
 
+    self.fire if window.button_down? Gosu::Button::KbLeftShift
+
     # Friction
     @speed_x = @speed_x * 0.97
     @speed_y = @speed_y * 0.97
@@ -98,6 +113,14 @@ class Player < Actor
 
     # Reset speeds
     @angle = @speed_x = @speed_y = 0
+  end
+
+  def fire
+    return if Gosu::milliseconds < (@last_shot_at || 0) + 300
+    @last_shot_at = Gosu::milliseconds
+
+    (@fire ||= Gosu::Sample.new(self.window, 'resources/sounds/laser.wav')).play
+    window.spawn_actor(Projectile.new(window, self)) 
   end
 
 end
@@ -129,6 +152,50 @@ class Meteor < Actor
 
     self.move
     self.keep_on_screen
+  end
+
+  def die
+    (@explosion = Gosu::Sample.new(self.window, 'resources/sounds/meteor_explosion.wav')).play
+    window.remove_actor(self)
+    window.spawn_actor(Meteor.new(self.window))
+  end
+
+end
+
+
+class Projectile < Actor
+
+  def initialize(window, player)
+    @window = window
+    @x = player.x
+    @y = player.y
+    @angle = player.angle
+    @speed_x = Gosu::offset_x(@angle, 5)
+    @speed_y = Gosu::offset_y(@angle, 5)
+    @image = Gosu::Image.new(window, 'resources/graphics/projectile.png')
+    @life = 100 # In ticks
+    @size = 5
+  end
+
+  def update
+    @life -= 1
+    self.die and return if @life < 0
+
+    if meteor = window.meteor
+      distance_to_meteor = Gosu::distance(self.x, self.y, meteor.x, meteor.y)
+      if distance_to_meteor < meteor.size / 2
+        meteor.die
+        self.die
+        return
+      end
+    end
+    
+    self.keep_on_screen
+    self.move
+  end
+
+  def die
+    window.remove_actor(self)
   end
 
 end
