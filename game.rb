@@ -11,6 +11,9 @@ class GameWindow < Gosu::Window
     @actors = []
     spawn_actor(Player.new(self))
     spawn_actor(Meteor.new(self))
+    spawn_actor(Meteor.new(self))
+    spawn_actor(Meteor.new(self))
+    spawn_actor(Meteor.new(self))
   end
   
   def update
@@ -28,8 +31,8 @@ class GameWindow < Gosu::Window
     @actors.find { |actor| actor.is_a?(Player) }
   end
 
-  def meteor
-    @actors.find { |actor| actor.is_a?(Meteor) }
+  def meteors
+    @actors.select { |actor| actor.is_a?(Meteor) }
   end
 
   def spawn_actor(actor)
@@ -105,7 +108,7 @@ class Player < Actor
   end
 
   def die
-    (@explosion ||= Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav')).play
+    self.window.spawn_actor(Explosion.new(self.window, self))
 
     # Center the player
     self.x = window.width / 2
@@ -127,20 +130,20 @@ end
 
 class Meteor < Actor
 
-  def initialize(window)
+  def initialize(window, options = {})
     @window = window
 
-    # Place the Meteor in the center of the GameWindow
-    @x = 0
-    @y = 0
+    # Place the Meteor in the corner of the GameWindow
+    @x = options[:x] || 0
+    @y = options[:y] || 0
+    @size = options[:size] || 100
     @angle = Gosu::random(0, 359)
     @rotation_speed = Gosu::random(-1, 1)
-    @size = 100
 
     @speed_x = Gosu::random(-2, 2)
     @speed_y = Gosu::random(-2, 2)
 
-    @image = Gosu::Image.new(window, 'resources/graphics/meteor_1.png')
+    @image = Gosu::Image.new(window, "resources/graphics/meteor_#{size}.png")
   end
 
   def update
@@ -157,11 +160,23 @@ class Meteor < Actor
   def die
     (@explosion = Gosu::Sample.new(self.window, 'resources/sounds/meteor_explosion.wav')).play
     window.remove_actor(self)
-    window.spawn_actor(Meteor.new(self.window))
+
+    if next_size
+      2.times do
+        window.spawn_actor(Meteor.new(self.window, :x => self.x, :y => self.y, :size => next_size))
+      end
+    end
+  end
+
+  def next_size
+    {
+      100 => 70,
+      70 => 50,
+      50 => 30
+    }[self.size]
   end
 
 end
-
 
 class Projectile < Actor
 
@@ -181,7 +196,7 @@ class Projectile < Actor
     @life -= 1
     self.die and return if @life < 0
 
-    if meteor = window.meteor
+    window.meteors.each do |meteor|
       distance_to_meteor = Gosu::distance(self.x, self.y, meteor.x, meteor.y)
       if distance_to_meteor < meteor.size / 2
         meteor.die
@@ -196,6 +211,28 @@ class Projectile < Actor
 
   def die
     window.remove_actor(self)
+  end
+
+end
+
+class Explosion < Actor
+
+  def initialize(window, player)
+    @window = window
+    @x = player.x
+    @y = player.y
+    @explosion = Gosu::Image.load_tiles(window, 'resources/graphics/explosion.png', 48, 48, false)
+    @spawn_time = Gosu::milliseconds
+    (@sound ||= Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav')).play
+  end
+
+  def update
+    @image_index = (Gosu::milliseconds - @spawn_time) / 100
+    self.window.remove_actor(self) if @image_index >= @explosion.length
+  end
+
+  def draw
+    @explosion[@image_index].draw_rot(self.x, self.y, 0, 0) if @image_index
   end
 
 end
