@@ -3,6 +3,7 @@
 require 'rubygems'
 require 'gosu'
 require 'activesupport'
+
 class GameWindow < Gosu::Window
 
   def initialize
@@ -44,7 +45,6 @@ class GameWindow < Gosu::Window
   end
 
 end
-
 
 class Actor
   attr_accessor :window, :x, :y, :angle, :size
@@ -144,6 +144,7 @@ class Meteor < Actor
     @speed_y = Gosu::random(-2, 2)
 
     @image = Gosu::Image.new(window, "resources/graphics/meteor_#{size}.png")
+    @color = self.random_color
   end
 
   def update
@@ -157,6 +158,10 @@ class Meteor < Actor
     self.keep_on_screen
   end
 
+  def draw
+    @image.draw_rot(self.x, self.y, 0, self.angle, 0.5, 0.5, 1, 1, @color)
+  end
+  
   def die
     (@explosion = Gosu::Sample.new(self.window, 'resources/sounds/meteor_explosion.wav')).play
     window.remove_actor(self)
@@ -174,6 +179,19 @@ class Meteor < Actor
       70 => 50,
       50 => 30
     }[self.size]
+  end
+
+  def random_color
+    # 0xAARRGGBB
+    possible_colors = [
+      0xffffffff,
+      0xffff6666,
+      0xff66ff66,
+      0xff6666ff,
+      0xffff66ff,
+      0xffffff66
+    ]
+    possible_colors[Gosu::random(0, possible_colors.length)]
   end
 
 end
