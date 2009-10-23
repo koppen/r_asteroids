@@ -25,6 +25,7 @@ class GameWindow < Gosu::Window
   end
   
   def draw
+    (@background ||= Gosu::Image.new(self, 'resources/graphics/background.png')).draw(0, 0, 0)
     @actors.each(&:draw)
   end
 
@@ -47,10 +48,15 @@ class GameWindow < Gosu::Window
 end
 
 class Actor
-  attr_accessor :window, :x, :y, :angle, :size
+  attr_accessor :window, :x, :y, :z, :angle, :size, :speed_x, :speed_y
+
+  def initialize(window)
+    self.window = window
+    self.x = self.y = self.z = self.angle = self.size = self.speed_x = self.speed_y = 0
+  end
 
   def draw
-    @image.draw_rot(self.x, self.y, 0, self.angle)
+    @image.draw_rot(self.x, self.y, self.z, self.angle)
   end
   
   def keep_on_screen
@@ -72,16 +78,13 @@ class Player < Actor
   attr_accessor :angle
 
   def initialize(window)
-    @window = window
+    super
 
     # Place the Player in the center of the GameWindow
     @x = window.width / 2
     @y = window.height / 2
-    @angle = 0
+    @z = ZOrder::PLAYER
     @size = 30
-    
-    @speed_x = 0
-    @speed_y = 0
 
     @image = Gosu::Image.new(window, 'resources/graphics/player.png')
   end
@@ -131,11 +134,12 @@ end
 class Meteor < Actor
 
   def initialize(window, options = {})
-    @window = window
+    super(window)
 
     # Place the Meteor in the corner of the GameWindow
     @x = options[:x] || 0
     @y = options[:y] || 0
+    @z = ZOrder::METEOR
     @size = options[:size] || 100
     @angle = Gosu::random(0, 359)
     @rotation_speed = Gosu::random(-1, 1)
@@ -185,11 +189,11 @@ class Meteor < Actor
     # 0xAARRGGBB
     possible_colors = [
       0xffffffff,
-      0xffff6666,
-      0xff66ff66,
-      0xff6666ff,
-      0xffff66ff,
-      0xffffff66
+      0xffffcccc,
+      0xffccffcc,
+      0xffccccff,
+      0xffffccff,
+      0xffffffcc
     ]
     possible_colors[Gosu::random(0, possible_colors.length)]
   end
@@ -199,9 +203,11 @@ end
 class Projectile < Actor
 
   def initialize(window, player)
-    @window = window
+    super(window)
+    
     @x = player.x
     @y = player.y
+    @z = ZOrder::PROJECTILE
     @angle = player.angle
     @speed_x = Gosu::offset_x(@angle, 5)
     @speed_y = Gosu::offset_y(@angle, 5)
@@ -236,10 +242,11 @@ end
 class Explosion < Actor
 
   def initialize(window, player)
-    @window = window
+    super(window)
     @x = player.x
     @y = player.y
-    @explosion = Gosu::Image.load_tiles(window, 'resources/graphics/explosion.png', 48, 48, false)
+    @z = ZOrder::EXPLOSION
+    @explosion = Gosu::Image.load_tiles(window, 'resources/graphics/explosion.png', 32, 32, false)
     @spawn_time = Gosu::milliseconds
     (@sound ||= Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav')).play
   end
@@ -250,9 +257,14 @@ class Explosion < Actor
   end
 
   def draw
-    @explosion[@image_index].draw_rot(self.x, self.y, 0, 0) if @image_index
+    @explosion[@image_index].draw_rot(self.x, self.y, ZOrder::EXPLOSION, 0) if @image_index
   end
 
 end
 
+module ZOrder
+  BACKGROUND, PROJECTILE, PLAYER, METEOR, EXPLOSION = *(0..4)
+end
+
 GameWindow.new.show
+
