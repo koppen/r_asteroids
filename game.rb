@@ -2,7 +2,6 @@
 
 require 'rubygems'
 require 'gosu'
-require 'activesupport'
 
 class GameWindow < Gosu::Window
 
@@ -11,21 +10,22 @@ class GameWindow < Gosu::Window
 
     @actors = []
     spawn_actor(Player.new(self))
-    spawn_actor(Meteor.new(self))
-    spawn_actor(Meteor.new(self))
-    spawn_actor(Meteor.new(self))
-    spawn_actor(Meteor.new(self))
+    4.times do
+      spawn_actor(Meteor.new(self))
+    end
+
+    @background = Gosu::Image.new(self, 'resources/graphics/background.png')
   end
-  
+
   def update
     # Quit?
     exit if button_down? Gosu::Button::KbEscape
 
     @actors.each(&:update)
   end
-  
+
   def draw
-    (@background ||= Gosu::Image.new(self, 'resources/graphics/background.png')).draw(0, 0, 0)
+    @background.draw(0, 0, ZOrder::BACKGROUND)
     @actors.each(&:draw)
   end
 
@@ -52,16 +52,20 @@ class Actor
 
   def initialize(window)
     self.window = window
+
+    # Reset generic actor values to... something
     self.x = self.y = self.z = self.angle = self.size = self.speed_x = self.speed_y = 0
   end
 
   def draw
     @image.draw_rot(self.x, self.y, self.z, self.angle)
   end
-  
+
+  # Keep Actor on the screen.
   def keep_on_screen
     radius = self.size / 2
-    # Keep the player on the screen. This isn't totally perfect, but works for now
+
+    # This calculation probably isn't totally perfect, but works for now
     @x = window.width + radius if @x < -radius
     @x = -radius if @x > window.width + radius
     @y = window.height + radius if @y < -radius
@@ -72,10 +76,14 @@ class Actor
     @x += @speed_x
     @y += @speed_y
   end
+
+  def die
+    window.remove_actor(self)
+  end
+
 end
 
 class Player < Actor
-  attr_accessor :angle
 
   def initialize(window)
     super
@@ -90,6 +98,13 @@ class Player < Actor
   end
 
   def update
+    self.handle_buttons
+    self.apply_friction
+    self.move
+    self.keep_on_screen
+  end
+
+  def handle_buttons
     # Rotate left and right
     @angle += 4 if window.button_down? Gosu::Button::KbRight
     @angle -= 4 if window.button_down? Gosu::Button::KbLeft
@@ -101,16 +116,15 @@ class Player < Actor
     end
 
     self.fire if window.button_down? Gosu::Button::KbLeftShift
+  end
 
-    # Friction
+  def apply_friction
     @speed_x = @speed_x * 0.97
     @speed_y = @speed_y * 0.97
-
-    self.move
-    self.keep_on_screen
   end
 
   def die
+    # Make Player go boom
     self.window.spawn_actor(Explosion.new(self.window, self))
 
     # Center the player
@@ -122,6 +136,7 @@ class Player < Actor
   end
 
   def fire
+    # Make sure there is some delay between each shot
     return if Gosu::milliseconds < (@last_shot_at || 0) + 300
     @last_shot_at = Gosu::milliseconds
 
@@ -152,23 +167,28 @@ class Meteor < Actor
   end
 
   def update
+    # Spin the meteor
+    @angle += @rotation_speed
+
+    self.detect_collision_with_player
+    self.move
+    self.keep_on_screen
+  end
+
+  # Kill the Player if Meteor is too close
+  def detect_collision_with_player
     player = window.player
     distance_to_player = Gosu::distance(self.x, self.y, player.x, player.y)
     player.die if distance_to_player < (self.size + player.size) / 2
-
-    @angle += @rotation_speed
-
-    self.move
-    self.keep_on_screen
   end
 
   def draw
     @image.draw_rot(self.x, self.y, 0, self.angle, 0.5, 0.5, 1, 1, @color)
   end
-  
+
   def die
+    super
     (@explosion = Gosu::Sample.new(self.window, 'resources/sounds/meteor_explosion.wav')).play
-    window.remove_actor(self)
 
     if next_size
       2.times do
@@ -177,6 +197,8 @@ class Meteor < Actor
     end
   end
 
+  # Returns the size of the meteors to spawn from Meteor when it dies. Returns nil if Meteor is the
+  # smallest possible size
   def next_size
     {
       100 => 70,
@@ -185,6 +207,7 @@ class Meteor < Actor
     }[self.size]
   end
 
+  # Returns a random color from the selection of possible meteor colors
   def random_color
     # 0xAARRGGBB
     possible_colors = [
@@ -204,7 +227,7 @@ class Projectile < Actor
 
   def initialize(window, player)
     super(window)
-    
+
     @x = player.x
     @y = player.y
     @z = ZOrder::PROJECTILE
@@ -220,6 +243,14 @@ class Projectile < Actor
     @life -= 1
     self.die and return if @life < 0
 
+    self.detect_collision_with_meteor
+    self.keep_on_screen
+    self.move
+  end
+
+  # Kills a Meteor if it is too close to Projectile. Also kills the Projectile to prevent each 
+  # projectile from hitting more than one Meteor.
+  def detect_collision_with_meteor
     window.meteors.each do |meteor|
       distance_to_meteor = Gosu::distance(self.x, self.y, meteor.x, meteor.y)
       if distance_to_meteor < meteor.size / 2
@@ -228,13 +259,6 @@ class Projectile < Actor
         return
       end
     end
-    
-    self.keep_on_screen
-    self.move
-  end
-
-  def die
-    window.remove_actor(self)
   end
 
 end
@@ -248,12 +272,12 @@ class Explosion < Actor
     @z = ZOrder::EXPLOSION
     @explosion = Gosu::Image.load_tiles(window, 'resources/graphics/explosion.png', 32, 32, false)
     @spawn_time = Gosu::milliseconds
-    (@sound ||= Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav')).play
+    @sound = Gosu::Sample.new(self.window, 'resources/sounds/player_explosion.wav').play
   end
 
   def update
     @image_index = (Gosu::milliseconds - @spawn_time) / 100
-    self.window.remove_actor(self) if @image_index >= @explosion.length
+    self.die if @image_index >= @explosion.length
   end
 
   def draw
